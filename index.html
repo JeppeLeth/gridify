@@ -176,11 +176,14 @@
             border: none;
             border-radius: 5px;
         }
-        .color-picker-label span {
-            width: 60px;
+        .color-picker-label input[type="text"] {
+            width: 70px;
+            height: 40px;
             font-size: 14px;
-            font-weight: bold;
             text-align: left;
+            padding: 0 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
         }
         .modal-content button {
             padding: 10px 20px;
@@ -224,12 +227,12 @@
         <div class="color-picker-label">
             <label for="colorFrom">From:</label>
             <input type="color" id="colorFrom">
-            <span id="colorFromHex"></span>
+            <input type="text" id="colorFromHex" placeholder="#FFFFFF">
         </div>
         <div class="color-picker-label">
             <label for="colorTo">To:</label>
             <input type="color" id="colorTo">
-            <span id="colorToHex"></span>
+            <input type="text" id="colorToHex" placeholder="#FFFFFF">
         </div>
         <button id="applyColorMagic">Apply</button>
     </div>
@@ -420,18 +423,47 @@
         const prominentColor = getMostProminentColor();
         colorFromInput.value = prominentColor;
         colorToInput.value = prominentColor;
-        colorFromHex.textContent = prominentColor;
-        colorToHex.textContent = prominentColor;
+        colorFromHex.value = prominentColor; // Set the input field
+        colorToHex.value = prominentColor; // Set the input field
         colorMagicModal.style.display = 'flex';
     });
 
-    // Update hex label when colors are changed
+    // Update hex input when colors are changed
     colorFromInput.addEventListener('input', () => {
-        colorFromHex.textContent = colorFromInput.value;
+        colorFromHex.value = colorFromInput.value;
     });
 
     colorToInput.addEventListener('input', () => {
-        colorToHex.textContent = colorToInput.value;
+        colorToHex.value = colorToInput.value;
+    });
+
+    // Function to ensure valid hex code formatting
+    function formatHexInput(input) {
+        let value = input.value.trim();
+        if (value.startsWith('#')) {
+            value = value.replace(/#+/g, '#'); // Replace multiple '#' with a single '#'
+        } else if (value.startsWith('##')) {
+            value = value = value.substring(1); // Remove leading '#' if present
+        }
+        if (value.length === 6 && !value.startsWith('#')) {
+            value = '#' + value; // Prepend '#' if necessary
+        }
+        input.value = value; // Set formatted value
+
+        // Check for valid hex code
+        const isValidHex = /^#?([0-9a-fA-F]{6})$/.test(value);
+        input.style.color = isValidHex ? 'black' : 'red'; // Change text color based on validity
+    }
+
+    // Update color input when hex is changed
+    colorFromHex.addEventListener('input', () => {
+        formatHexInput(colorFromHex);
+        colorFromInput.value = colorFromHex.value; // Sync with color picker
+    });
+
+    colorToHex.addEventListener('input', () => {
+        formatHexInput(colorToHex);
+        colorToInput.value = colorToHex.value; // Sync with color picker
     });
 
     // Close the modal when the Escape key is pressed
