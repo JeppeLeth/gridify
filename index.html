@@ -194,6 +194,17 @@
             background-color: #0078d4;
             color: #fff;
         }
+        /* Error message styles */
+        .error-message {
+            display: none;
+            color: red;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid red;
+            border-radius: 5px;
+            background-color: #ffe6e6;
+            white-space: pre-wrap; /* Preserve line breaks */
+        }
     </style>
 </head>
 <body>
@@ -204,6 +215,9 @@
         <p>Drag & drop your SVG files here or click to upload</p>
         <input type="file" id="fileInput" accept=".svg" multiple>
     </div>
+
+    <!-- Error Message Container -->
+    <div id="errorContainer" class="error-message"></div>
 
     <!-- Tools Panel -->
     <div class="tools-panel">
@@ -243,6 +257,7 @@
     const fileInput = document.getElementById('fileInput');
     const svgGrid = document.getElementById('svgGrid');
     const emptyMessage = document.getElementById('emptyMessage');
+    const errorContainer = document.getElementById('errorContainer');
     const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
     const downloadAllBtn = document.getElementById('downloadAllBtn');
     const clearAllBtn = document.getElementById('clearAllBtn');
@@ -271,24 +286,73 @@
     });
     fileInput.addEventListener('change', () => handleFiles(fileInput.files));
 
-    function handleFiles(files) {
+    async function handleFiles(files) {
+        const invalidFiles = [];
+        const validFilesPromises = [];
+
         Array.from(files).forEach(file => {
             if (file.type === 'image/svg+xml') {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const src = e.target.result;
-                    if (!imageSources.has(src)) {
-                        imageSources.add(src);
-                        createGridItem(src, file.name);
-                        saveImageToLocalStorage(src, file.name);
-                        updateButtonStates();
-                    }
-                };
-                reader.readAsDataURL(file);
+                // Read the file as text
+                const filePromise = readFileAsText(file)
+                    .then(content => {
+                        if (isValidSVG(content)) {
+                            const src = `data:image/svg+xml;base64,${btoa(content)}`;
+                            if (!imageSources.has(src)) {
+                                imageSources.add(src);
+                                createGridItem(src, file.name);
+                                saveImageToLocalStorage(src, file.name);
+                            }
+                        } else {
+                            invalidFiles.push(file.name);
+                        }
+                    })
+                    .catch(() => {
+                        invalidFiles.push(file.name);
+                    });
+                validFilesPromises.push(filePromise);
             } else {
-                alert('Only SVG files are allowed.');
+                invalidFiles.push(file.name);
             }
         });
+
+        // Wait for all file validations to complete
+        await Promise.all(validFilesPromises);
+
+        if (invalidFiles.length > 0) {
+            showError(invalidFiles);
+        }
+
+        updateButtonStates();
+        updateEmptyMessage();
+    }
+
+    function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('File read error'));
+            reader.readAsText(file);
+        });
+    }
+
+    function isValidSVG(content) {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(content, 'image/svg+xml');
+            const svgElement = doc.querySelector('svg');
+            return svgElement !== null;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function showError(invalidFiles) {
+        errorContainer.textContent = `Invalid files:\n${invalidFiles.join('\n')}`;
+        errorContainer.style.display = 'block';
+
+        setTimeout(() => {
+            errorContainer.style.display = 'none';
+        }, 5000); // Hide after 5 seconds
     }
 
     function createGridItem(src, name) {
@@ -440,30 +504,38 @@
     // Function to ensure valid hex code formatting
     function formatHexInput(input) {
         let value = input.value.trim();
-        if (value.startsWith('#')) {
-            value = value.replace(/#+/g, '#'); // Replace multiple '#' with a single '#'
-        } else if (value.startsWith('##')) {
-            value = value = value.substring(1); // Remove leading '#' if present
+        // Remove all characters except # and hex digits
+        value = value.replace(/[^#0-9a-fA-F]/g, '');
+        // Replace multiple '#' with a single '#'
+        value = value.replace(/#+/g, '#');
+        // Remove '#' if it's not followed by exactly 6 hex digits
+        if (value.length > 1 && !/^#[0-9a-fA-F]{6}$/.test(value)) {
+            value = value.substring(0, 1) + value.substring(1).replace(/[^0-9a-fA-F]/g, '');
         }
+        // Prepend '#' if necessary
         if (value.length === 6 && !value.startsWith('#')) {
-            value = '#' + value; // Prepend '#' if necessary
+            value = '#' + value;
         }
-        input.value = value; // Set formatted value
+        input.value = value;
 
         // Check for valid hex code
-        const isValidHex = /^#?([0-9a-fA-F]{6})$/.test(value);
+        const isValidHex = /^#[0-9a-fA-F]{6}$/.test(value);
         input.style.color = isValidHex ? 'black' : 'red'; // Change text color based on validity
     }
 
     // Update color input when hex is changed
     colorFromHex.addEventListener('input', () => {
         formatHexInput(colorFromHex);
-        colorFromInput.value = colorFromHex.value; // Sync with color picker
+        if (/^#[0-9a-fA-F]{6}$/.test(colorFromHex.value)) {
+            colorFromInput.value = colorFromHex.value;
+        }
     });
 
     colorToHex.addEventListener('input', () => {
         formatHexInput(colorToHex);
-        colorToInput.value = colorToHex.value; // Sync with color picker
+        if (/^#[0-9a-fA-F]{6}$/.test(colorToHex.value)) {
+            colorToInput.value = colorToHex.value;
+        }
     });
 
     // Close the modal when the Escape key is pressed
@@ -477,6 +549,15 @@
     applyColorMagicBtn.addEventListener('click', () => {
         const fromColor = colorFromInput.value.trim();
         const toColor = colorToInput.value.trim();
+
+        // Validate hex codes before applying
+        const isValidFrom = /^#[0-9a-fA-F]{6}$/.test(fromColor);
+        const isValidTo = /^#[0-9a-fA-F]{6}$/.test(toColor);
+
+        if (!isValidFrom || !isValidTo) {
+            alert('Please enter valid hex codes.');
+            return;
+        }
 
         let colorReplaced = false;
         document.querySelectorAll('.grid-item img').forEach((img) => {
