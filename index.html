@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Upload and Display Grid</title>
+    <style>
+        /* Basic styles */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        .container {
+            width: 80%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .upload-container, .tools-panel, .grid-container {
+            text-align: center;
+            padding: 20px;
+            border: 2px dashed #0078d4;
+            border-radius: 10px;
+            background-color: #fff;
+        }
+        .upload-container:hover {
+            background-color: #f9f9f9;
+        }
+        .upload-container input[type="file"] {
+            display: none;
+        }
+        .tools-panel {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .tools-panel button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #0078d4;
+            color: #fff;
+        }
+        .tools-panel button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .grid-container {
+            position: relative;
+        }
+        .empty-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-size: 16px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+        }
+        .grid-item {
+            position: relative;
+            width: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border: 1px solid #ddd;
+            padding: 5px;
+            box-sizing: border-box;
+            transition: transform 0.2s;
+        }
+        .grid-item:hover {
+            transform: scale(1.05);
+        }
+        .grid-item img {
+            max-width: 100%;
+            max-height: 80px;
+        }
+        .filename {
+            width: 90px;
+            height: 40px;
+            font-size: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.2;
+            margin-top: 5px;
+        }
+        /* Download Icon on Hover */
+        .download-icon {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 16px;
+            height: 16px;
+            background-color: #0078d4;
+            mask: url('data:image/svg+xml;base64,PHN2ZyBjbGFzcz0iZmVhdGhlciBmZWF0aGVyLWRvd25sb2FkIiBmaWxsPSJub25lIiBoZWlnaHQ9IjE2IiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjE2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yMSAxNXY0YTIgMiAwIDAgMS0yIDJINSBhMiAyIDAgMCAxLTItMnYtNCIvPjxwb2x5bGluZSBwb2ludHM9IjcgMTAgMTIgMTUgMTcgMTAiLz48bGluZSB4MT0iMTIiIHgyPSIxMiIgeTE9IjE1IiB5Mj0iMyIvPjwvc3ZnPg==') no-repeat center;
+            display: none;
+            cursor: pointer;
+        }
+        .grid-item:hover .download-icon {
+            display: block;
+        }
+        /* Selection Marker */
+        .select-marker {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 14px;
+            height: 14px;
+            background-color: #fff;
+            border: 1px solid #0078d4;
+            border-radius: 3px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .grid-item:hover .select-marker,
+        .select-marker.selected {
+            display: flex;
+        }
+        .select-marker.selected {
+            background-color: #0078d4;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 320px;
+            text-align: center;
+        }
+        .color-picker-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: flex-start;
+            margin: 10px 0;
+        }
+        .color-picker-label label {
+            width: 50px;
+            font-weight: bold;
+            text-align: right;
+        }
+        .color-picker-label input[type="color"] {
+            flex-grow: 1;
+            max-width: 80%;
+            height: 40px;
+            border: none;
+            border-radius: 5px;
+        }
+        .color-picker-label span {
+            width: 60px;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: left;
+        }
+        .modal-content button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #0078d4;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Upload Container -->
+    <div class="upload-container" id="uploadContainer">
+        <p>Drag & drop your SVG files here or click to upload</p>
+        <input type="file" id="fileInput" accept=".svg" multiple>
+    </div>
+
+    <!-- Tools Panel -->
+    <div class="tools-panel">
+        <button id="downloadSelectedBtn" disabled>Download Selected</button>
+        <button id="downloadAllBtn" disabled>Download All</button>
+        <button id="clearAllBtn" disabled>Clear All Data</button>
+        <button id="colorMagicBtn" disabled>Color Magic</button>
+    </div>
+
+    <!-- Grid Container -->
+    <div class="grid-container">
+        <div class="empty-message" id="emptyMessage">There are no images uploaded</div>
+        <div class="grid" id="svgGrid"></div>
+    </div>
+</div>
+
+<!-- Color Magic Modal -->
+<div class="modal" id="colorMagicModal">
+    <div class="modal-content">
+        <h3>Color Magic</h3>
+        <div class="color-picker-label">
+            <label for="colorFrom">From:</label>
+            <input type="color" id="colorFrom">
+            <span id="colorFromHex"></span>
+        </div>
+        <div class="color-picker-label">
+            <label for="colorTo">To:</label>
+            <input type="color" id="colorTo">
+            <span id="colorToHex"></span>
+        </div>
+        <button id="applyColorMagic">Apply</button>
+    </div>
+</div>
+
+<script>
+    const uploadContainer = document.getElementById('uploadContainer');
+    const fileInput = document.getElementById('fileInput');
+    const svgGrid = document.getElementById('svgGrid');
+    const emptyMessage = document.getElementById('emptyMessage');
+    const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const colorMagicBtn = document.getElementById('colorMagicBtn');
+    const colorMagicModal = document.getElementById('colorMagicModal');
+    const applyColorMagicBtn = document.getElementById('applyColorMagic');
+    const colorFromInput = document.getElementById('colorFrom');
+    const colorToInput = document.getElementById('colorTo');
+    const colorFromHex = document.getElementById('colorFromHex');
+    const colorToHex = document.getElementById('colorToHex');
+    const imageSources = new Set();
+
+    // Load images from localStorage on page load
+    window.addEventListener('load', loadImagesFromLocalStorage);
+
+    uploadContainer.addEventListener('click', () => fileInput.click());
+    uploadContainer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadContainer.classList.add('hover');
+    });
+    uploadContainer.addEventListener('dragleave', () => uploadContainer.classList.remove('hover'));
+    uploadContainer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadContainer.classList.remove('hover');
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    function handleFiles(files) {
+        Array.from(files).forEach(file => {
+            if (file.type === 'image/svg+xml') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const src = e.target.result;
+                    if (!imageSources.has(src)) {
+                        imageSources.add(src);
+                        createGridItem(src, file.name);
+                        saveImageToLocalStorage(src, file.name);
+                        updateButtonStates();
+                    }
+                };
+                reader.readAsDataURL(file);
+            } else {
+                alert('Only SVG files are allowed.');
+            }
+        });
+    }
+
+    function createGridItem(src, name) {
+        const img = document.createElement('img');
+        img.src = src;
+        
+        const filename = document.createElement('div');
+        filename.classList.add('filename');
+        filename.textContent = name;
+
+        const gridItem = document.createElement('div');
+        gridItem.classList.add('grid-item');
+
+        // Selection marker
+        const selectMarker = document.createElement('div');
+        selectMarker.classList.add('select-marker');
+        selectMarker.addEventListener('click', (event) => {
+            event.stopPropagation();
+            selectMarker.classList.toggle('selected');
+            updateButtonStates();
+        });
+        gridItem.appendChild(selectMarker);
+
+        // Download icon
+        const downloadIcon = document.createElement('div');
+        downloadIcon.classList.add('download-icon');
+        downloadIcon.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const link = document.createElement('a');
+            link.href = img.src; // Use current img.src
+            link.download = name;
+            link.click();
+        });
+        gridItem.appendChild(downloadIcon);
+
+        gridItem.appendChild(img);
+        gridItem.appendChild(filename);
+        svgGrid.appendChild(gridItem);
+        updateEmptyMessage();
+    }
+
+    function saveImageToLocalStorage(src, name) {
+        const images = JSON.parse(localStorage.getItem('uploadedImages')) || [];
+        images.push({ src, name });
+        localStorage.setItem('uploadedImages', JSON.stringify(images));
+    }
+
+    function loadImagesFromLocalStorage() {
+        const images = JSON.parse(localStorage.getItem('uploadedImages')) || [];
+        images.forEach(({ src, name }) => {
+            imageSources.add(src);
+            createGridItem(src, name);
+        });
+        updateButtonStates();
+        updateEmptyMessage();
+    }
+
+    function downloadSelected() {
+        document.querySelectorAll('.grid-item .select-marker.selected').forEach((marker) => {
+            const img = marker.parentElement.querySelector('img');
+            const name = marker.parentElement.querySelector('.filename').textContent;
+            initiateDownload(img.src, name);
+        });
+    }
+
+    function downloadAll() {
+        document.querySelectorAll('.grid-item img').forEach((img) => {
+            const name = img.parentElement.querySelector('.filename').textContent;
+            initiateDownload(img.src, name);
+        });
+    }
+
+    function initiateDownload(dataUrl, filename) {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = filename;
+        link.click();
+    }
+
+    function clearAllData() {
+        if (confirm("This will clear all the images on the page. Do you want to proceed?")) {
+            localStorage.removeItem('uploadedImages');
+            svgGrid.innerHTML = '';
+            imageSources.clear();
+            updateButtonStates();
+            updateEmptyMessage();
+        }
+    }
+
+    function updateButtonStates() {
+        // Enable "Download All" if there are images in the grid
+        downloadAllBtn.disabled = svgGrid.children.length === 0;
+
+        // Enable "Download Selected" if there are any selected images
+        const hasSelectedImages = document.querySelectorAll('.grid-item .select-marker.selected').length > 0;
+        downloadSelectedBtn.disabled = !hasSelectedImages;
+
+        // Enable "Clear All Data" and "Color Magic" if there are images in the grid or data in localStorage
+        const hasImagesInLocalStorage = JSON.parse(localStorage.getItem('uploadedImages') || "[]").length > 0;
+        clearAllBtn.disabled = svgGrid.children.length === 0 && !hasImagesInLocalStorage;
+        colorMagicBtn.disabled = svgGrid.children.length === 0;
+    }
+
+    function updateEmptyMessage() {
+        // Show the empty message if there are no images in the grid
+        emptyMessage.style.display = svgGrid.children.length === 0 ? 'block' : 'none';
+    }
+
+    // Function to extract prominent color from the first few images
+    function getMostProminentColor() {
+        const colorCount = {};
+        const images = Array.from(svgGrid.querySelectorAll('.grid-item img')).slice(0, 5);
+
+        images.forEach((img) => {
+            const svgContent = atob(img.src.split(',')[1]);
+            const colors = svgContent.match(/#[0-9a-fA-F]{6}/g) || [];
+
+            colors.forEach((color) => {
+                const lowerColor = color.toLowerCase();
+                if (lowerColor !== '#ffffff') {
+                    colorCount[lowerColor] = (colorCount[lowerColor] || 0) + 1;
+                }
+            });
+        });
+
+        // Find the most frequent color (besides white)
+        return Object.keys(colorCount).reduce((a, b) => colorCount[a] > colorCount[b] ? a : b, '#000000');
+    }
+
+    // Open the Color Magic modal and prefill the "From" and "To" inputs
+    colorMagicBtn.addEventListener('click', () => {
+        const prominentColor = getMostProminentColor();
+        colorFromInput.value = prominentColor;
+        colorToInput.value = prominentColor;
+        colorFromHex.textContent = prominentColor;
+        colorToHex.textContent = prominentColor;
+        colorMagicModal.style.display = 'flex';
+    });
+
+    // Update hex label when colors are changed
+    colorFromInput.addEventListener('input', () => {
+        colorFromHex.textContent = colorFromInput.value;
+    });
+
+    colorToInput.addEventListener('input', () => {
+        colorToHex.textContent = colorToInput.value;
+    });
+
+    // Close the modal when the Escape key is pressed
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && colorMagicModal.style.display === 'flex') {
+            colorMagicModal.style.display = 'none';
+        }
+    });
+
+    // Apply Color Magic
+    applyColorMagicBtn.addEventListener('click', () => {
+        const fromColor = colorFromInput.value.trim();
+        const toColor = colorToInput.value.trim();
+
+        let colorReplaced = false;
+        document.querySelectorAll('.grid-item img').forEach((img) => {
+            const svgContent = atob(img.src.split(',')[1]);
+            const updatedSvgContent = svgContent.replace(new RegExp(fromColor, 'gi'), toColor);
+
+            if (svgContent !== updatedSvgContent) {
+                const updatedSrc = 'data:image/svg+xml;base64,' + btoa(updatedSvgContent);
+                img.src = updatedSrc;
+                colorReplaced = true;
+            }
+        });
+
+        if (!colorReplaced) {
+            alert(`No images contain the color code ${fromColor}`);
+        }
+
+        colorMagicModal.style.display = 'none';
+    });
+
+    // Close modal when clicking outside content
+    colorMagicModal.addEventListener('click', (e) => {
+        if (e.target === colorMagicModal) {
+            colorMagicModal.style.display = 'none';
+        }
+    });
+
+    document.getElementById('downloadSelectedBtn').addEventListener('click', downloadSelected);
+    document.getElementById('downloadAllBtn').addEventListener('click', downloadAll);
+    document.getElementById('clearAllBtn').addEventListener('click', clearAllData);
+</script>
+
+</body>
+</html>
